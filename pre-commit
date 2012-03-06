@@ -63,6 +63,7 @@ if stdout:
 			output = re.sub("WARNING ", str(colored.yellow("WARNING ")), output)
 			output = re.sub("ERROR ", str(colored.red("ERROR ")), output)
 
+			output = re.sub("STDIN", path, output)
 			print(output)
 
 			if len(errors) > 0:

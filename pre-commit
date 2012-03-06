@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+import subprocess
+import re
+import sys
+from clint.textui import colored
+from time import sleep
+
+PHPCS_STANDARD="Tuna"
+
+def parse_ranges(ranges):
+	parsed_ranges = []
+	for range_item in ranges:
+		parsed_ranges.append(parse_range(range_item[1]))
+	return parsed_ranges
+
+
+def parse_range(range_item):
+	begin, length = range_item.split(",")
+	return (int(begin), int(begin)+int(length))
+
+def in_range(range, val):
+	return int(range[0]) < int(val) < int(range[1])
+
+changed_files_command = "git diff --cached --name-only --diff-filter=AM HEAD -- *.php"
+process = subprocess.Popen(changed_files_command.split(), stdout=subprocess.PIPE)
+
+(stdout, _) = process.communicate()
+
+errors_re = re.compile("(\d+) ERROR")
+warnings_re = re.compile("(\d+) WARNING")
+diff_re = re.compile("@ -(\d+\,\d+) \+(\d+\,\d+) @")
+error_re = re.compile("(\d+) \| ERROR")
+
+found_errors = 0
+
+if stdout:
+	for path in stdout.decode().strip().split("\n"):
+		check_style_command = "phpcs --standard={} -".format(PHPCS_STANDARD).split()
+
+		diff_command = "git diff --cached --".split()
+		diff_command.append(path.strip())
+
+		committed_file_command = "git show".split()
+		committed_file_command.append(":" + path.strip())
+
+		committed_file = subprocess.Popen(committed_file_command, stdout=subprocess.PIPE)
+
+		phpcs = subprocess.Popen(check_style_command, stdin=committed_file.stdout, stdout=subprocess.PIPE)
+
+		(result, _) = phpcs.communicate()
+		output = result.decode()
+
+		if "FOUND" in output:
+			diff = subprocess.Popen(diff_command, stdout=subprocess.PIPE)
+			(result, _) = diff.communicate()
+			diff_output = result.decode()
+
+			ranges = parse_ranges(diff_re.findall(diff_output))
+
+			errors = error_re.findall(output)
+			warnings = warnings_re.search(output)
+
+			output = re.sub("WARNING ", str(colored.yellow("WARNING ")), output)
+			output = re.sub("ERROR ", str(colored.red("ERROR ")), output)
+
+			print(output)
+
+			if len(errors) > 0:
+				found_errors = 2
+				for error in errors:
+					for range_item in ranges:
+						if in_range(range_item, error):
+							found_errors = 3
+			elif int(warnings.group(1)) > 0:
+				if found_errors < 1:
+					found_errors = 1
+
+
+if found_errors == 3:
+	print(colored.red("Style errors, aborting commit"))
+	sys.exit(1)
+if found_errors == 2:
+	print(colored.red("Style errors, in unchanged code"))
+	sleep(3)
+elif found_errors == 1:
+	print(colored.yellow("Style warnings, proceeding"))
+	sleep(3)
+else:
+	print(colored.green("Everything okay :)"))
+

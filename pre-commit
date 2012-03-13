@@ -37,7 +37,7 @@ if stdout:
 	for path in stdout.decode().strip().split("\n"):
 		check_style_command = "phpcs --standard={} -".format(PHPCS_STANDARD).split()
 
-		diff_command = "git diff --cached --".split()
+		diff_command = "git diff --cached -U0 --".split()
 		diff_command.append(path.strip())
 
 		committed_file_command = "git show".split()

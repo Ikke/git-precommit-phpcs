@@ -81,7 +81,7 @@ if found_errors == 3:
 	print(colored.red("Style errors, aborting commit"))
 	sys.exit(1)
 if found_errors == 2:
-	print(colored.red("Style errors, in unchanged code"))
+	print(colored.yellow("Style errors, in unchanged code"))
 	sleep(3)
 elif found_errors == 1:
 	print(colored.yellow("Style warnings, proceeding"))

@@ -33,6 +33,8 @@ error_re = re.compile("(\d+) \| ERROR")
 
 found_errors = 0
 
+critical_errors=[]
+
 if stdout:
 	for path in stdout.decode().strip().split("\n"):
 		check_style_command = "phpcs --standard={} -".format(PHPCS_STANDARD).split()
@@ -71,6 +73,7 @@ if stdout:
 				for error in errors:
 					for range_item in ranges:
 						if in_range(range_item, error):
+							critical_errors.append((error, path))
 							found_errors = 3
 			elif int(warnings.group(1)) > 0:
 				if found_errors < 1:
@@ -79,13 +82,15 @@ if stdout:
 
 if found_errors == 3:
 	print(colored.red("Style errors, aborting commit"))
+	for linenr, path in critical_errors:
+		print(linenr, path)
 	sys.exit(1)
 if found_errors == 2:
 	print(colored.yellow("Style errors, in unchanged code"))
-	sleep(3)
+	sleep(1)
 elif found_errors == 1:
 	print(colored.yellow("Style warnings, proceeding"))
-	sleep(3)
+	sleep(1)
 else:
 	print(colored.green("Everything okay :)"))
 

@@ -19,7 +19,7 @@ def parse_range(range_item):
 	return (int(begin), int(begin)+int(length))
 
 def in_range(range, val):
-	return int(range[0]) < int(val) < int(range[1])
+	return int(range[0]) <= int(val) <= int(range[1])
 
 changed_files_command = "git diff --cached --name-only --diff-filter=AM HEAD -- *.php"
 process = subprocess.Popen(changed_files_command.split(), stdout=subprocess.PIPE)

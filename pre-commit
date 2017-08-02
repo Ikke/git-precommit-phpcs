@@ -2,6 +2,7 @@
 import subprocess
 import re
 import sys
+import csv
 from clint.textui import colored
 from time import sleep
 
@@ -15,7 +16,13 @@ def parse_ranges(ranges):
 
 
 def parse_range(range_item):
-	begin, length = range_item.split(",")
+	split_result = range_item.split(",")
+	begin = split_result[0]
+	try:
+		length = split_result[1]
+	except IndexError:
+		length = 1
+	
 	return (int(begin), int(begin)+int(length))
 
 def in_range(range, val):
@@ -28,9 +35,8 @@ process = subprocess.Popen(changed_files_command.split(), stdout=subprocess.PIPE
 
 errors_re = re.compile("(\d+) ERROR")
 warnings_re = re.compile("(\d+) WARNING")
-diff_re = re.compile("@ -(\d+\,\d+) \+(\d+\,\d+) @")
-error_re = re.compile("(\d+) \| ERROR")
-
+diff_re = re.compile("@ -(\d+(?:\,\d+)?) \+(\d+(?:\,\d+)?) @")
+error_re = re.compile("(\d+) \| ERROR\s+\|([^(]*)")
 found_errors = 0
 
 critical_errors=[]
@@ -51,7 +57,8 @@ if stdout:
 
 		(result, _) = phpcs.communicate()
 		output = result.decode()
-
+		ansi_escape = re.compile(r'\x1b[^m]*m')
+		output = ansi_escape.sub('', output)
 		if "FOUND" in output:
 			diff = subprocess.Popen(diff_command, stdout=subprocess.PIPE)
 			(result, _) = diff.communicate()
@@ -72,7 +79,10 @@ if stdout:
 				found_errors = 2
 				for error in errors:
 					for range_item in ranges:
-						if in_range(range_item, error):
+						if in_range(range_item, error[0]):
+							error = list (error)
+							error[1] = error[1].replace('|',"")
+							error[1] = re.compile("\s+").sub(' ',error[1])
 							critical_errors.append((error, path))
 							found_errors = 3
 			elif int(warnings.group(1)) > 0:
@@ -82,8 +92,8 @@ if stdout:
 
 if found_errors == 3:
 	print(colored.red("Style errors, aborting commit"))
-	for linenr, path in critical_errors:
-		print(linenr, path)
+	for error, path in critical_errors:
+		print("line " + error[0] + " in " + path + " => " + error[1])
 	sys.exit(1)
 if found_errors == 2:
 	print(colored.yellow("Style errors, in unchanged code"))
